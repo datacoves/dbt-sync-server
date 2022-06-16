@@ -6,7 +6,9 @@ with another solution like `dbt.lib` which dbt server may implicitly use.
 import multiprocessing
 import subprocess
 import time
+import os
 from typing import Dict
+from pathlib import Path
 
 import click
 from flask import Flask, request
