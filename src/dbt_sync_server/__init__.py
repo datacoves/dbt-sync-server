@@ -97,7 +97,11 @@ def run_rpc(
         f"Starting RPC port:{rpc_port} project_dir:{project_dir} profiles_dir:{profiles_dir} profile:{profile} target:{target}"
     )  # noqa
     try:
-        with open("dbt_rpc.log", "w") as f:
+        log_filename = os.getenv("DBT_RPC_LOG_FILENAME", "./dbt_rpc.log")
+
+        log_file = Path(log_filename)
+
+        with log_file.open("w") as f:
             subprocess.run(
                 [
                     "dbt-rpc",
