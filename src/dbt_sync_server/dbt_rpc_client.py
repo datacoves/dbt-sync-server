@@ -64,7 +64,7 @@ class DbtClient:
         }
         pid = self._get_pid()
 
-        if method == "run_sql":
+        if method == "run_sql" and self.pid:
             print(f"Method: {method}, send HUP to {self.pid}")
             os.kill(self.pid, signal.SIGHUP)
             sleep(DEFAULT_SYNC_SLEEP)
@@ -100,7 +100,10 @@ class DbtClient:
         proc2.stdout.close()
         proc3.stdout.close()
         out, err = proc4.communicate()
-        self.pid = int(out.strip().decode())
+        try:
+            self.pid = int(out.strip().decode())
+        except ValueError:
+            self.pid = None
 
         return self.pid
 

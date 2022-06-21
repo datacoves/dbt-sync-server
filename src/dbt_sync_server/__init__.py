@@ -159,47 +159,13 @@ def serve(
 ):
     STATE["server"] = DbtClient(port=rpc_port)
     if not no_inject_rpc:
-        rpc_server = multiprocessing.Process(
-            target=run_rpc,
-            args=(rpc_port, project_dir, profiles_dir, profile, target),
-            daemon=True,
-        )
-        rpc_server.start()
-        time.sleep(2.5)
-        if not rpc_server.is_alive():
-            exit_code = rpc_server.exitcode
-            rpc_server.close()
-            if exit_code == 0:
-                print(
-                    "RPC failed to initialize, exit code {} most likely indicates a process is already running on port {} or the project directory provided [{}] is not a valid dbt project.".format(
-                        exit_code, rpc_port, project_dir
-                    )
-                )
-            elif exit_code == 1:
-                print(
-                    "RPC failed to initialize, exit code {} most likely indicates the dbt project is invalid or has an error.".format(
-                        exit_code
-                    )
-                )
-            else:
-                print(
-                    "RPC failed to initialize, exit code {} with unknown root cause.".format(
-                        exit_code
-                    )
-                )
+        try:
+            rpc_server = exec_rpc(rpc_port, project_dir, profiles_dir, profile, target)
+        except Exception as e:
+            print(e)
             exit(1)
     try:
-        # ping RPC to gaurantee connectivity before starting flask app
-        ping_count = 0
-        while ping_count < 3:
-            if not health_check().get("error"):
-                print("RPC health check passed!")
-                break
-            ping_count += 1
-            time.sleep(2.5)
-        else:
-            print("RPC health check failing, final attempt")
-            health_check(raise_on_error=True)
+        check_rpc()
         app.run("localhost", port)
     finally:
         print("\nSHUTDOWN")
@@ -208,6 +174,56 @@ def serve(
             rpc_server.terminate()
             rpc_server.join()
             rpc_server.close()
+
+
+def exec_rpc(
+    port: int = 8580,
+    project_dir: str = "./",
+    profiles_dir: str = "~/.dbt",
+    profile: str = "default",
+    target: str = "dev",
+    wait_time: float = 2.5
+):
+    rpc_server = multiprocessing.Process(
+        target=run_rpc,
+        args=(port, project_dir, profiles_dir, profile, target),
+        daemon=True,
+    )
+    rpc_server.start()
+    time.sleep(wait_time)
+    if not rpc_server.is_alive():
+        exit_code = rpc_server.exitcode
+        rpc_server.close()
+        error = False
+        if exit_code == 0:
+            error = "RPC failed to initialize, exit code {} most likely indicates a process is already running on port {} or the project directory provided [{}] is not a valid dbt project.".format(
+                    exit_code, port, project_dir
+                )
+        elif exit_code == 1:
+            error = "RPC failed to initialize, exit code {} most likely indicates the dbt project is invalid or has an error.".format(
+                    exit_code
+                )
+        else:
+            error = "RPC failed to initialize, exit code {} with unknown root cause.".format(
+                    exit_code
+                )
+
+        if error:
+            raise(Exception(error))
+    return rpc_server
+
+def check_rpc(wait_time: float = 2.5):
+    # ping RPC to gaurantee connectivity before starting flask app
+    ping_count = 0
+    while ping_count < 3:
+        if not health_check().get("error"):
+            print("RPC health check passed!")
+            break
+        ping_count += 1
+        time.sleep(wait_time)
+    else:
+        print("RPC health check failing, final attempt")
+        health_check(raise_on_error=True)
 
 
 @cli.command()
