@@ -202,6 +202,13 @@ class DbtClient:
             raise ValueError("timeout_action must be 'raise', 'return' or a callable")
 
         response_data = self._request(method, params=params)
+
+        while "error" in response_data and response_data['error']['code'] == 10010:
+            sleep(DEFAULT_SYNC_SLEEP)
+            if (timeout is not None) and (time() >= max_time):
+                break
+            response_data = self._request(method, params=params)
+
         if "result" in response_data:
             if "request_token" in response_data["result"]:
                 request_token = response_data["result"]["request_token"]
