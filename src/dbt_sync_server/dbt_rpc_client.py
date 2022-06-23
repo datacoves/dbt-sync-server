@@ -204,9 +204,16 @@ class DbtClient:
         response_data = self._request(method, params=params)
 
         while "error" in response_data and response_data['error']['code'] == 10010:
-            sleep(DEFAULT_SYNC_SLEEP)
             if (timeout is not None) and (time() >= max_time):
-                break
+                if callable(timeout_action):
+                    timeout_action()
+                elif timeout_action == "raise":
+                    raise Exception("Timed out waiting for response")
+                elif timeout_action == "return":
+                    return response_data
+
+            sleep(DEFAULT_SYNC_SLEEP)
+
             response_data = self._request(method, params=params)
 
         if "result" in response_data:
