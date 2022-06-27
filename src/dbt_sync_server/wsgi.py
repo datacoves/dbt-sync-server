@@ -4,8 +4,8 @@ from dbt_sync_server import DbtClient, STATE, app, exec_rpc, check_rpc
 rpc_port = os.getenv("RPC_PORT", 8580)
 project_dir = os.getenv("PROJECT_DIR", "./")
 profiles_dir = os.getenv("PROFILES_DIR", "~/.dbt")
-profile = os.getenv("PROFILE", "default")
-target = os.getenv("TARGET", "dev")
+profile = os.getenv("PROFILE")
+target = os.getenv("TARGET")
 
 STATE["server"] = DbtClient(port=rpc_port)
 

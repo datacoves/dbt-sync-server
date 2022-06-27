@@ -93,7 +93,11 @@ def health_check(raise_on_error: bool = False) -> Dict[str, str]:
 
 
 def run_rpc(
-    rpc_port: int, project_dir: str, profiles_dir: str, profile: str, target: str
+    rpc_port: int,
+    project_dir: str,
+    profiles_dir: str,
+    profile: str = None,
+    target: str = None,
 ):
     print(
         f"Starting RPC port:{rpc_port} project_dir:{project_dir} profiles_dir:{profiles_dir} profile:{profile} target:{target}"
@@ -104,26 +108,30 @@ def run_rpc(
         log_file = Path(log_filename)
 
         with log_file.open("w") as f:
-            subprocess.run(
-                [
-                    "dbt-rpc",
-                    "serve",
-                    "--port",
-                    str(rpc_port),
-                    "--project-dir",
-                    str(project_dir),
-                    "--profiles-dir",
-                    str(profiles_dir),
+            args = [
+                "dbt-rpc",
+                "serve",
+                "--port",
+                str(rpc_port),
+                "--project-dir",
+                str(project_dir),
+                "--profiles-dir",
+                str(profiles_dir),
+            ]
+            if profile:
+                args += [
                     "--profile",
                     str(profile),
+                ]
+            if target:
+                args += [
                     "--target",
                     str(target),
-                ],
-                stdout=f,
-                stderr=subprocess.STDOUT,
-            )
+                ]
+
+            subprocess.run(args, stdout=f, stderr=subprocess.STDOUT)
     except Exception as err:
-        print("RPC Terminated? Error: {}".format(str(err)))
+        print(f"RPC Terminated? Error: {err}")
 
 
 @click.group()
@@ -145,16 +153,16 @@ def cli():
     type=click.Path(exists=True, file_okay=False, dir_okay=True),
     default="~/.dbt",
 )
-@click.option("--profile", type=click.STRING, default="default")
-@click.option("--target", type=click.STRING, default="dev")
+@click.option("--profile", type=click.STRING)
+@click.option("--target", type=click.STRING)
 @click.option("--no-inject-rpc", is_flag=True, type=click.BOOL, default=False)
 def serve(
     port: int = 8581,
     rpc_port: int = 8580,
     project_dir: str = "./",
     profiles_dir: str = "~/.dbt",
-    profile: str = "default",
-    target: str = "dev",
+    profile: str = None,
+    target: str = None,
     no_inject_rpc: bool = False,
 ):
     STATE["server"] = DbtClient(port=rpc_port)
@@ -180,9 +188,9 @@ def exec_rpc(
     port: int = 8580,
     project_dir: str = "./",
     profiles_dir: str = "~/.dbt",
-    profile: str = "default",
-    target: str = "dev",
-    wait_time: float = 2.5
+    profile: str = None,
+    target: str = None,
+    wait_time: float = 2.5,
 ):
     rpc_server = multiprocessing.Process(
         target=run_rpc,
@@ -196,21 +204,17 @@ def exec_rpc(
         rpc_server.close()
         error = False
         if exit_code == 0:
-            error = "RPC failed to initialize, exit code {} most likely indicates a process is already running on port {} or the project directory provided [{}] is not a valid dbt project.".format(
-                    exit_code, port, project_dir
-                )
+            error = f"RPC failed to initialize, exit code {exit_code} most likely indicates a process "
+            "is already running on port {port} or the project directory provided [{project_dir}] is not a valid dbt project."
         elif exit_code == 1:
-            error = "RPC failed to initialize, exit code {} most likely indicates the dbt project is invalid or has an error.".format(
-                    exit_code
-                )
+            error = f"RPC failed to initialize, exit code {exit_code} most likely indicates the dbt project is invalid or has an error."
         else:
-            error = "RPC failed to initialize, exit code {} with unknown root cause.".format(
-                    exit_code
-                )
+            error = f"RPC failed to initialize, exit code {exit_code} with unknown root cause."
 
         if error:
-            raise(Exception(error))
+            raise Exception(error)
     return rpc_server
+
 
 def check_rpc(wait_time: float = 2.5):
     # ping RPC to gaurantee connectivity before starting flask app
